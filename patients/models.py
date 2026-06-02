@@ -56,3 +56,25 @@ class DischargeCarePlan(models.Model):
 
     def __str__(self):
         return f"Care Plan for {self.patient.name}"
+    
+
+class ExcelPatientRecord(models.Model):
+    # Use the MRN as the unique primary identifier
+    medical_record_number = models.CharField(max_length=50, primary_key=True, verbose_name="MRN")
+    patient_name = models.CharField(max_length=255)
+    date_of_birth = models.CharField(max_length=20)  # Keeping as string to match your text format safely
+    date_of_admission = models.CharField(max_length=20)
+    date_of_discharge = models.CharField(max_length=20)
+    attending_physician = models.CharField(max_length=255)
+    primary_diagnosis = models.CharField(max_length=255)
+    
+    # Using TextField for long clinical notes and summaries
+    medical_history_summary = models.TextField(blank=True, null=True)
+    treatment_plan = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.patient_name} ({self.medical_record_number})"
+
+    class Meta:
+        verbose_name = "Excel Patient Record"
+        verbose_name = "Excel Patient Records"

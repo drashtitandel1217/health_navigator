@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from patients.views import patient_dashboard_view  
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('dashboard/', patient_dashboard_view, name='patient_dashboard'),
 ]
