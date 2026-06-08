@@ -4,7 +4,6 @@ from django.core.management.base import BaseCommand
 from patients.models import ExcelPatientRecord
 
 class Command(BaseCommand):
-    help = "Reads the parsed Excel database from Desktop and migrates it into the Django SQLite Database"
 
     def handle(self, *args, **options):
         # 📂 Target your spreadsheet path on your Desktop
