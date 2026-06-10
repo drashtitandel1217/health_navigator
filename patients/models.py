@@ -56,23 +56,28 @@ class DischargeCarePlan(models.Model):
 
     def __str__(self):
         return f"Care Plan for {self.patient.name}"
-    
 
 class ExcelPatientRecord(models.Model):
-  
-    medical_record_number = models.CharField(max_length=50, primary_key=True, verbose_name="MRN")
     patient_name = models.CharField(max_length=255)
-    date_of_birth = models.CharField(max_length=20)  
-    date_of_admission = models.CharField(max_length=20)
-    date_of_discharge = models.CharField(max_length=20)
-    attending_physician = models.CharField(max_length=255)
+    medical_record_number = models.CharField(max_length=100, unique=True)
+    date_of_birth = models.DateField()
+    date_of_admission = models.DateField()
+    date_of_discharge = models.DateField(blank=True, null=True)
     primary_diagnosis = models.CharField(max_length=255)
-
+    attending_physician = models.CharField(max_length=255)
     medical_history_summary = models.TextField(blank=True, null=True)
-    treatment_plan = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.patient_name} ({self.medical_record_number})"
+    
+class ChatbotInquiryLog(models.Model):
+    raw_input_text = models.TextField()
+    processed_input_text = models.TextField()
+    ai_response_reply = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Query on {self.timestamp.strftime('%Y-%m-%d %H:%M')}: {self.raw_input_text[:30]}..."
 
     class Meta:
         verbose_name = "Excel Patient Record"
