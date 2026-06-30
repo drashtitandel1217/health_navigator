@@ -1,142 +1,457 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Health Navigator Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Oncology Telemetry Console V.2.4</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;family=Space+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --obsidian: #0a0e17;
+            --cyan-glow: rgba(0, 220, 230, 0.4);
+            --crimson-glow: rgba(255, 180, 171, 0.5);
+        }
+
+        body {
+            background-color: var(--obsidian);
+            background-image: 
+                linear-gradient(rgba(58, 73, 75, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(58, 73, 75, 0.05) 1px, transparent 1px);
+            background-size: 32px 32px;
+            color: #dfe2ef;
+            overflow-x: hidden;
+        }
+
+        .glass-plate {
+            background: rgba(15, 19, 28, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(132, 148, 149, 0.2);
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+        }
+
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 220, 230, 0.5);
+            box-shadow: 0 0 10px var(--cyan-glow);
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: scan 3s linear infinite;
+            z-index: 10;
+        }
+
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .hazard-pulse {
+            animation: hazard-glow 2s infinite alternate;
+        }
+
+        @keyframes hazard-glow {
+            from { border-color: rgba(147, 0, 10, 0.4); box-shadow: 0 0 5px rgba(147, 0, 10, 0.2); }
+            to { border-color: #ffb4ab; box-shadow: 0 0 20px rgba(147, 0, 10, 0.6); }
+        }
+
+        .clipped-btn {
+            clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+        }
+
+        .progress-segment {
+            background: linear-gradient(90deg, transparent 2px, currentColor 2px);
+            background-size: 8px 100%;
+        }
+
+        .sidebar-transition {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#849495",
+                        "primary": "#e0fdff",
+                        "surface": "#0f131c",
+                        "secondary": "#4edea3",
+                        "primary-fixed-dim": "#00dce6",
+                        "outline-variant": "#3a494b",
+                        "surface-container-lowest": "#0a0e17",
+                        "error": "#ffb4ab",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#1c1f29"
+                    },
+                    "fontFamily": {
+                        "body-base": ["JetBrains Mono"],
+                        "label-caps": ["JetBrains Mono"],
+                        "display-lg": ["Space Grotesk"],
+                        "headline-md": ["Space Grotesk"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="fixed inset-0 z-50 bg-slate-900 flex flex-col h-screen w-screen font-sans antialiased text-slate-200">
-    
-    <header class="bg-slate-950 border-b border-slate-800 px-6 py-4 flex justify-between items-center shadow-lg">
-        <div class="flex items-center space-x-3">
-            <div class="relative flex items-center justify-center">
-                <div class="w-3.5 h-3.5 bg-emerald-500 rounded-full animate-ping absolute"></div>
-                <div class="w-3.5 h-3.5 bg-emerald-400 rounded-full relative"></div>
-            </div>
-            <div>
-                <h1 class="text-lg font-bold tracking-wide text-white">HealthNavigator Predictive AI Engine</h1>
-                <p class="text-xs text-slate-400">Connected to Random Forest Length of Stay Regressor Module</p>
-            </div>
+<body class="font-body-base text-on-surface antialiased">
+    <!-- Top Navigation Anchor -->
+    <header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20 shadow-[0_0_15px_rgba(0,220,230,0.1)] flex justify-between items-center px-4 md:px-8 h-16">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary-fixed-dim" data-icon="clinical_notes">clinical_notes</span>
+            <h1 class="font-headline-md text-[18px] tracking-tighter uppercase text-primary-fixed-dim">TELEMETRY CONSOLE V.2.4 ACTIVE</h1>
         </div>
-        <div class="flex items-center space-x-4">
-            <a href="/upload/" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors shadow-md">
-                📤 Upload New Excel
-            </a>
+        <div class="flex items-center gap-6">
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] text-outline uppercase font-bold tracking-widest">System Latency</span>
+                <span class="text-secondary text-[12px]">0.004ms</span>
+            </div>
+            <span class="material-symbols-outlined text-primary-fixed-dim cursor-crosshair active:scale-95" data-icon="sensors">sensors</span>
         </div>
     </header>
 
-    <div class="flex-1 flex overflow-hidden">
-        
-        <aside class="w-80 bg-slate-950 border-r border-slate-800 p-6 space-y-6 hidden md:flex flex-col overflow-y-auto">
-            <div>
-                <h3 class="text-xs font-bold text-slate-400 tracking-wider uppercase mb-3">Sample Inquiries</h3>
-                <ul class="space-y-2 text-xs text-slate-400">
-                    <li class="p-2.5 bg-slate-900/50 rounded-lg border border-slate-800/40 hover:border-indigo-500/30 cursor-pointer transition-colors" onclick="document.getElementById('chat-input').value=this.innerText">"What is the stay forecast metric for patient Sherry Emery?"</li>
-                    <li class="p-2.5 bg-slate-900/50 rounded-lg border border-slate-800/40 hover:border-indigo-500/30 cursor-pointer transition-colors" onclick="document.getElementById('chat-input').value=this.innerText">"Analyze discharge timeline parameters for MRN L999."</li>
-                </ul>
+    <main class="pt-24 pb-24 px-4 md:px-8 max-w-[1440px] mx-auto h-full">
+        <!-- Message Notification Overlay Banners -->
+        {% if messages %}
+            <div class="mb-6 space-y-2 text-xs font-mono">
+                {% for message in messages %}
+                    <div class="p-3.5 rounded-xl border flex justify-between items-center {% if message.tags == 'success' %}bg-emerald-950/40 border-emerald-500/30 text-emerald-400{% else %}bg-rose-950/40 border-rose-500/30 text-rose-400{% endif %}">
+                        <span>{{ message }}</span>
+                        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white ml-4 font-bold text-sm">✕</button>
+                    </div>
+                {% endfor %}
             </div>
-        </aside>
+        {% endif %}
 
-        <main class="flex-1 flex flex-col bg-slate-900 relative">
-            
-            <div id="chat-messages" class="flex-1 p-6 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-slate-800">
-                <div class="flex items-start space-x-3 max-w-3xl">
-                    <div class="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">AI</div>
-                    <div class="bg-slate-800 border border-slate-700/60 text-slate-200 rounded-2xl rounded-tl-none px-5 py-3.5 shadow-xl leading-relaxed text-sm">
-                        Welcome to AI Health Navigator! How can we help you ?
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <!-- Left Column: Data Ingestion & Live Stream -->
+            <div class="md:col-span-8 flex flex-col gap-6">
+                <!-- Data Ingestion Matrix -->
+                <section class="glass-plate p-6 relative overflow-hidden">
+                    <div class="scanline"></div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-label-caps text-[12px] uppercase text-primary-fixed-dim tracking-[0.2em] flex items-center gap-2">
+                            <span class="w-2 h-2 bg-primary-fixed-dim animate-pulse"></span>
+                            Data Ingestion Matrix
+                        </h2>
+                        <span class="text-outline text-[10px]">SCANNER_ID: ALPHA-09</span>
+                    </div>
+                    <form action="{% url 'upload_excel' %}" method="POST" enctype="multipart/form-data" id="upload-form">
+                        {% csrf_token %}
+                        <label for="excel_file" class="border-2 border-dashed border-outline-variant/40 rounded-lg p-10 flex flex-col items-center justify-center group cursor-pointer hover:border-primary-fixed-dim transition-colors relative block">
+                            <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required
+                                   class="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                   onchange="document.getElementById('upload-form').submit();">
+                            <div class="absolute inset-0 bg-primary-fixed-dim/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <span class="material-symbols-outlined text-[48px] text-outline group-hover:text-primary-fixed-dim mb-4" data-icon="biotech">biotech</span>
+                            <p class="text-center font-label-caps text-[14px] text-outline mb-2">Insert Bio-Sample Digital Stream (Excel)</p>
+                            <div class="w-full max-w-xs h-1 bg-surface-container relative overflow-hidden mt-4">
+                                <div class="absolute top-0 left-0 h-full w-1/3 bg-primary-fixed-dim shadow-[0_0_10px_#00dce6] animate-[move_2s_infinite]"></div>
+                            </div>
+                        </label>
+                    </form>
+                </section>
+
+                <!-- Patient Diagnostic Stream (Terminal Ledger) -->
+                <section class="glass-plate p-6 border-l-4 border-error/50 hazard-pulse flex flex-col justify-between min-h-[420px]">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="font-display-lg text-[24px] uppercase tracking-tighter text-error">CLINICAL TELEMETRY LEDGER</h2>
+                            <p class="text-outline text-[12px]">INTERACTION_LOG: SECURE_CHANNEL</p>
+                        </div>
+                        <div class="px-3 py-1 bg-error/10 border border-error text-error text-[10px] font-bold tracking-widest uppercase animate-pulse">
+                            AI INTERACTION BUFFER
+                        </div>
+                    </div>
+                    
+                    <!-- Chat ledger terminal entries -->
+                    <div id="chat-ledger" class="space-y-4 font-body-base text-[13px] leading-relaxed max-h-[300px] overflow-y-auto mb-6 pr-2 scrollbar-thin scrollbar-thumb-outline-variant">
+                        <!-- Welcoming AI Ledger message -->
+                        <div class="flex gap-4 p-4 bg-surface-container-lowest border border-outline-variant/30">
+                            <span class="text-primary-fixed-dim font-bold font-mono">SYS_INIT</span>
+                            <p><span class="text-secondary">[CONSOLE]:</span> HealthNavigator AI interface online. Enter a patient name, MRN key (e.g., John Doe, V202) or symptom profile parameters below to query telemetry.</p>
+                        </div>
+                    </div>
+
+                    <!-- Asynchronous console input controller -->
+                    <div class="flex gap-3 bg-surface-container border border-outline-variant/30 p-2 rounded-lg">
+                        <input type="text" id="chat-input" placeholder="Query a patient name, MRN, or symptoms..." 
+                               class="flex-1 bg-transparent border-0 focus:ring-0 focus:outline-none text-[13px] text-white font-mono placeholder-outline px-3 py-2">
+                        <button id="send-btn" class="clipped-btn bg-primary-fixed-dim/10 border border-primary-fixed-dim px-6 py-2 text-primary-fixed-dim font-label-caps text-[12px] hover:bg-primary-fixed-dim hover:text-surface-container-lowest transition-all">
+                            SEND_QUERY
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Column: Telemetry Stack -->
+            <div class="md:col-span-4 flex flex-col gap-6">
+                <!-- Real-Time Pathology Telemetry -->
+                <section class="glass-plate p-6 flex flex-col gap-8">
+                    <div class="border-b border-outline-variant/20 pb-4">
+                        <h3 class="font-label-caps text-[14px] text-primary-fixed-dim tracking-widest">PATHOLOGY TELEMETRY</h3>
+                    </div>
+                    <!-- Live Database Inventory -->
+                    <div class="flex flex-col items-center">
+                        <div class="relative w-48 h-48">
+                            <svg class="w-full h-full transform -rotate-90">
+                                <circle class="text-surface-container" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="8"></circle>
+                                <circle class="text-secondary shadow-[0_0_10px_rgba(78,222,163,0.5)]" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502.6" stroke-dashoffset="120" stroke-width="8"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="font-display-lg text-[32px] text-white">{{ total_records_formatted }}</span>
+                                <span class="text-outline text-[10px] uppercase font-bold">RECORDS</span>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-center text-[11px] text-outline tracking-wider">LIVE_DATABASE_FEED_ACTIVE</p>
+                    </div>
+                    <!-- Class Distribution -->
+                    <div class="space-y-6">
+                        <div>
+                            <div class="flex justify-between text-[11px] font-bold mb-2">
+                                <span class="text-white">BLADDER</span>
+                                <span class="text-secondary">{{ bladder_pct }}%</span>
+                            </div>
+                            <div class="h-2 w-full bg-surface-container overflow-hidden">
+                                <div class="h-full bg-secondary progress-segment" style="width: {{ bladder_pct }}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] font-bold mb-2">
+                                <span class="text-white">COLORECTAL</span>
+                                <span class="text-primary-fixed-dim">{{ colorectal_pct }}%</span>
+                            </div>
+                            <div class="h-2 w-full bg-surface-container overflow-hidden">
+                                <div class="h-full bg-primary-fixed-dim progress-segment" style="width: {{ colorectal_pct }}%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] font-bold mb-2">
+                                <span class="text-white">CERVICAL</span>
+                                <span class="text-error">{{ cervical_pct }}%</span>
+                            </div>
+                            <div class="h-2 w-full bg-surface-container overflow-hidden">
+                                <div class="h-full bg-error progress-segment" style="width: {{ cervical_pct }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Diagnostic Readout (Embedded Image) -->
+                <div class="glass-plate overflow-hidden h-48 relative group">
+                    <div class="absolute inset-0 z-10 bg-gradient-to-t from-surface-container-lowest to-transparent"></div>
+                    <div class="absolute top-4 left-4 z-20 font-label-caps text-[10px] text-primary-fixed-dim bg-surface/60 px-2 py-1">GENETIC_MORPHOLOGY_SCAN</div>
+                    <div class="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="A hyper-realistic microscopic clinical view of cellular oncology structures. The image has a high-tech cyan and emerald diagnostic overlay with neon sparklines and technical readouts. The background is dark obsidian with a subtle medical mesh pattern, creating a high-stakes tactical medical environment." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBai9TcUf0r6yu422kgsgqbKxEcyI70f7j8HcIp1OfUFmoDHDJUgmOIQui1Nuy0L6hjWoWv66jK4uyC2iQZMMb35YzBBZDvxNXnSOxf7dCAZ8cycpKvEECwxWkcUTEyIOPVbK2zAVUL5nHoEEsEZAhsSk6fBwdqotCPyK9iWSG3grLUh8oaE3WOPYiizIoKRA0v7AS3OncZdfkeEyg0jQxoBwCkn17CDmu2JAgwFEU1gWf7Z_tUCLCWQxd55ePv5m0iThPwMMkfa9c')"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Slidable Diagnostic Readout Panel (Right Sidebar) -->
+    <aside class="fixed top-0 right-0 h-full w-80 bg-surface-container-lowest/95 backdrop-blur-2xl border-l border-outline-variant/30 z-[60] sidebar-transition translate-x-full shadow-[-10px_0_30px_rgba(0,0,0,0.5)]" id="diag-panel">
+        <button class="absolute -left-10 top-20 bg-primary-fixed-dim p-2 text-surface-container-lowest clipped-btn shadow-[0_0_15px_#00dce6]" onclick="toggleSidebar()">
+            <span class="material-symbols-outlined" id="toggle-icon">chevron_left</span>
+        </button>
+        <div class="p-6 h-full flex flex-col gap-6">
+            <h4 class="font-headline-md text-[18px] text-primary-fixed-dim tracking-widest border-b border-outline-variant/30 pb-4">METADATA_EXTRACT</h4>
+            <div class="space-y-4 text-[11px]">
+                <div class="p-3 bg-surface-container border border-outline-variant/10">
+                    <p class="text-outline uppercase mb-1">Process Thread</p>
+                    <p class="text-secondary">THREAD_ID_8829-X</p>
+                </div>
+                <div class="p-3 bg-surface-container border border-outline-variant/10">
+                    <p class="text-outline uppercase mb-1">Node Integrity</p>
+                    <p class="text-primary-fixed-dim">99.8% STABLE</p>
+                </div>
+                <div class="p-3 bg-surface-container border border-outline-variant/10">
+                    <p class="text-outline uppercase mb-1">Sample Queries</p>
+                    <ul class="space-y-2 mt-2 font-mono text-[10px] text-primary-fixed-dim">
+                        <li class="cursor-pointer hover:underline flex items-center gap-1.5" onclick="runSample('What is the stay forecast metric for patient John Doe?')">
+                            <span class="w-1.5 h-1.5 bg-secondary rounded-full"></span> Forecast John Doe
+                        </li>
+                        <li class="cursor-pointer hover:underline flex items-center gap-1.5" onclick="runSample('Analyze discharge timeline parameters for MRN V202.')">
+                            <span class="w-1.5 h-1.5 bg-secondary rounded-full"></span> Analyze MRN V202
+                        </li>
+                    </ul>
+                </div>
+                <div class="pt-4 mt-auto">
+                    <h5 class="text-outline text-[10px] uppercase font-bold mb-4">Raw Telemetry Dump</h5>
+                    <div class="font-body-sm text-[10px] text-outline-variant leading-tight h-48 overflow-y-auto bg-black/30 p-2 border border-outline-variant/20">
+                        [0.0001] INIT_SEQ: TRUE<br/>
+                        [0.0023] V_MAPPING: CALIBRATED<br/>
+                        [0.0045] LOAD_PATIENT: PAT_882<br/>
+                        [0.0051] ANALYZE_METASTASIS: HIGH_CON<br/>
+                        [0.0067] ALERT_TRIGGERED: RAD_CYAN<br/>
+                        [0.0090] DATA_INGEST_STATUS: STANDBY<br/>
+                        [0.0112] BUFFER_CLEAR: 2048KB<br/>
+                        [0.0156] KERNEL_TIME: 14:02:22:90<br/>
+                        [0.0233] SYNCING_DISTRIBUTION...<br/>
+                        [0.0345] SUCCESS: BIO_SYNC_OK
                     </div>
                 </div>
             </div>
+        </div>
+    </aside>
 
-            <div class="p-6 bg-slate-950/60 border-t border-slate-800/80 backdrop-blur-md">
-                <div class="max-w-4xl mx-auto flex items-center space-x-4 bg-slate-900 border border-slate-700/80 rounded-2xl p-2.5 focus-within:border-indigo-500 transition-all shadow-inner">
-                    <input type="text" id="chat-input" placeholder="Query a patient name or MRN system key tracking string..." 
-                           class="flex-1 bg-transparent px-4 py-3 text-sm focus:outline-none text-white placeholder-slate-500">
-                    <button id="send-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-6 py-3 rounded-xl transition-all shadow-md hover:scale-[1.02] active:scale-95">
-                       Send
-                    </button>
-                </div>
-            </div>
+    <!-- Bottom Navigation Shell -->
+    <nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-md border-t border-outline-variant/30 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+        <div class="flex justify-around items-center w-full h-20 px-2">
+            <a class="flex flex-col items-center justify-center text-outline p-2 opacity-60 hover:opacity-100 hover:text-primary-fixed-dim transition-all duration-300" href="#">
+                <span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+                <span class="font-label-caps text-[10px] mt-1">HUD</span>
+            </a>
+            <a class="flex flex-col items-center justify-center text-secondary bg-secondary/10 rounded-none [clip-path:polygon(10%_0,100%_0,100%_70%,90%_100%,0_100%,0_30%)] p-2 shadow-[0_0_10px_rgba(78,222,163,0.3)] transition-all duration-300" href="#">
+                <span class="material-symbols-outlined" data-icon="vital_signs" style="font-variation-settings: 'FILL' 1;">vital_signs</span>
+                <span class="font-label-caps text-[10px] mt-1">BIO</span>
+            </a>
+            <a class="flex flex-col items-center justify-center text-outline p-2 opacity-60 hover:opacity-100 hover:text-primary-fixed-dim transition-all duration-300" href="#">
+                <span class="material-symbols-outlined" data-icon="biotech">biotech</span>
+                <span class="font-label-caps text-[10px] mt-1">DRAG</span>
+            </a>
+            <a class="flex flex-col items-center justify-center text-outline p-2 opacity-60 hover:opacity-100 hover:text-primary-fixed-dim transition-all duration-300" href="#">
+                <span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+                <span class="font-label-caps text-[10px] mt-1">LOG</span>
+            </a>
+        </div>
+    </nav>
 
-        </main>
-    </div>
-</div>
-
-<script>
-    const sendBtn = document.getElementById('send-btn');
-    const chatInput = document.getElementById('chat-input');
-    const chatMessages = document.getElementById('chat-messages');
-
-    function appendMessage(text, isUser = false) {
-        const wrapper = document.createElement('div');
-        wrapper.className = isUser ? 'flex items-start justify-end space-x-3 max-w-3xl ml-auto' : 'flex items-start space-x-3 max-w-3xl';
-        
-        // Avatar Node
-        const avatar = document.createElement('div');
-        if (isUser) {
-            avatar.className = 'w-8 h-8 bg-slate-700 rounded-xl flex items-center justify-center font-bold text-sm text-white order-2 flex-shrink-0';
-            avatar.innerText = 'ME';
-        } else {
-            avatar.className = 'w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0';
-            avatar.innerText = 'AI';
-        }
-
-        const bubble = document.createElement('div');
-        bubble.className = isUser 
-            ? 'bg-indigo-600 border border-indigo-500 text-white rounded-2xl rounded-tr-none px-5 py-3.5 shadow-xl leading-relaxed text-sm font-medium order-1'
-            : 'bg-slate-800 border border-slate-700/60 text-slate-200 rounded-2xl rounded-tl-none px-5 py-3.5 shadow-xl leading-relaxed text-sm';
-        
-        // Simple line break parsing for cleaner presentation
-        bubble.innerHTML = text.replace(/\n/g, '<br>');
-        
-        wrapper.appendChild(avatar);
-        wrapper.appendChild(bubble);
-        chatMessages.appendChild(wrapper);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    async function handleSendMessage() {
-        const queryText = chatInput.value.trim();
-        if (!queryText) return;
-
-        appendMessage(queryText, true);
-        chatInput.value = '';
-
-        // Matrix loading text layout row block
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'flex justify-start text-xs text-indigo-400 font-mono tracking-wider animate-pulse pl-11 py-2';
-        loadingDiv.innerText = '▶ RUNNING SCALER TRANSFORMERS & REGRESSION MATRIX TREES...';
-        chatMessages.appendChild(loadingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        try {
-            const response = await fetch('/chatbot/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({ message: queryText })
-            });
-
-            const data = await response.json();
-            loadingDiv.remove();
-
-            if (data.reply) {
-                appendMessage(data.reply, false);
-            } else if (data.error) {
-                appendMessage(`⚠️ System Exception Error: ${data.error}`, false);
+    <script>
+        let sidebarOpen = false;
+        function toggleSidebar() {
+            const panel = document.getElementById('diag-panel');
+            const icon = document.getElementById('toggle-icon');
+            sidebarOpen = !sidebarOpen;
+            
+            if (sidebarOpen) {
+                panel.classList.remove('translate-x-full');
+                icon.innerText = 'chevron_right';
+            } else {
+                panel.classList.add('translate-x-full');
+                icon.innerText = 'chevron_left';
             }
-        } catch (err) {
-            loadingDiv.remove();
-            appendMessage("❌ Fatal Connection Error: Broken path channel line link to Django view controller.", false);
         }
-    }
 
-    sendBtn.addEventListener('click', handleSendMessage);
-    chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
-</script>
+        // Pulse the health rings randomly for "Live" effect
+        setInterval(() => {
+            const rings = document.querySelectorAll('circle');
+            rings.forEach(ring => {
+                if(ring.getAttribute('stroke-dashoffset') !== null) {
+                    const current = parseInt(ring.getAttribute('stroke-dashoffset'));
+                    const jitter = (Math.random() - 0.5) * 5;
+                    ring.style.transition = 'stroke-dashoffset 0.5s ease-in-out';
+                    ring.setAttribute('stroke-dashoffset', current + jitter);
+                }
+            });
+        }, 1000);
+
+        // Chatbot interaction JS handler
+        const sendBtn = document.getElementById('send-btn');
+        const chatInput = document.getElementById('chat-input');
+        const chatLedger = document.getElementById('chat-ledger');
+
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toTimeString().split(' ')[0];
+        }
+
+        function appendLedgerEntry(sender, text, isUser = false) {
+            const entry = document.createElement('div');
+            entry.className = `flex gap-4 p-4 ${isUser ? 'bg-surface-container border border-primary-fixed-dim/30' : 'bg-surface-container-lowest border border-outline-variant/30'}`;
+            
+            const timestamp = document.createElement('span');
+            timestamp.className = isUser ? 'text-secondary font-bold font-mono' : 'text-primary-fixed-dim font-bold font-mono';
+            timestamp.innerText = getCurrentTime();
+
+            const body = document.createElement('p');
+            
+            // Sender tag
+            const tag = document.createElement('span');
+            tag.className = isUser ? 'text-primary-fixed-dim font-bold mr-1' : 'text-secondary font-bold mr-1';
+            tag.innerText = `[${sender}]:`;
+            
+            body.appendChild(tag);
+            
+            // Text container
+            const textSpan = document.createElement('span');
+            textSpan.innerHTML = text.replace(/\n/g, '<br>');
+            body.appendChild(textSpan);
+
+            entry.appendChild(timestamp);
+            entry.appendChild(body);
+            chatLedger.appendChild(entry);
+            chatLedger.scrollTop = chatLedger.scrollHeight;
+        }
+
+        async function handleSendMessage() {
+            const queryText = chatInput.value.trim();
+            if (!queryText) return;
+
+            // Append user query
+            appendLedgerEntry('USER', queryText, true);
+            chatInput.value = '';
+
+            // Loading log entry
+            const loadingEntry = document.createElement('div');
+            loadingEntry.id = 'ledger-loading';
+            loadingEntry.className = 'flex gap-4 p-3 text-xs text-primary-fixed-dim font-mono animate-pulse';
+            loadingEntry.innerHTML = `<span>${getCurrentTime()}</span><span>▶ PROCESS: SOLVING PROBABILISTIC LOGIC GRAPH...</span>`;
+            chatLedger.appendChild(loadingEntry);
+            chatLedger.scrollTop = chatLedger.scrollHeight;
+
+            try {
+                const response = await fetch('{% url "patient_dashboard" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ message: queryText })
+                });
+
+                const data = await response.json();
+                const loading = document.getElementById('ledger-loading');
+                if (loading) loading.remove();
+
+                if (data.reply) {
+                    appendLedgerEntry('AI_VOICE', data.reply, false);
+                } else if (data.error) {
+                    appendLedgerEntry('LEDGER_ERROR', `Anomaly: ${data.error}`, false);
+                }
+            } catch (err) {
+                const loading = document.getElementById('ledger-loading');
+                if (loading) loading.remove();
+                appendLedgerEntry('LEDGER_ERROR', 'Connection fault in terminal sync bus line.', false);
+            }
+        }
+
+        function runSample(query) {
+            chatInput.value = query;
+            handleSendMessage();
+        }
+
+        sendBtn.addEventListener('click', handleSendMessage);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+    </script>
+    <style>
+        @keyframes move {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(300%); }
+        }
+    </style>
 </body>
 </html>

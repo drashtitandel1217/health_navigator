@@ -5,12 +5,23 @@ import numpy as np
 import spacy
 import re
 from .models import ExcelPatientRecord
+from django.conf import settings
 
 # 🧠 Safe spaCy Loader Block
 try:
     nlp = spacy.load("en_core_web_sm")
 except:
     nlp = None
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MODEL_PATH = os.path.join(BASE_DIR, "length_of_stay_model.pkl")
+if not os.path.exists(MODEL_PATH):
+    MODEL_PATH = os.path.join(os.path.dirname(BASE_DIR), "length_of_stay_model.pkl")
+
+PREPROCESSOR_PATH = os.path.join(BASE_DIR, "data_preprocessor.pkl")
+if not os.path.exists(PREPROCESSOR_PATH):
+    PREPROCESSOR_PATH = os.path.join(os.path.dirname(BASE_DIR), "data_preprocessor.pkl")
 
 def parse_patient_from_query(user_text):
     if not nlp or not user_text:
@@ -40,18 +51,28 @@ def parse_patient_from_query(user_text):
 
     return None
 
-try:
-    model = joblib.load(MODEL_PATH)
-    preprocessor = joblib.load(PREPROCESSOR_PATH)
-except Exception as e:
-    print(f"⚠️ Model load warning: {e}")
-    model, preprocessor = None, None
+model = None
+preprocessor = None
+
+def load_model_binaries():
+    global model, preprocessor
+    try:
+        model = joblib.load(MODEL_PATH)
+        preprocessor = joblib.load(PREPROCESSOR_PATH)
+    except Exception as e:
+        print(f"⚠️ Model load warning: {e}")
+        model, preprocessor = None, None
+
+load_model_binaries()
 
 def predict_patient_stay(patient_object):
     """
     Takes a patient object, safely extracts features without invoking the missing 'id' column,
     and runs it through the preprocessor and Random Forest model.
     """
+    global model, preprocessor
+    if model is None or preprocessor is None:
+        load_model_binaries()
     if not model or not preprocessor:
         return "Model binaries (.pkl) are missing or not loaded correctly."
 
