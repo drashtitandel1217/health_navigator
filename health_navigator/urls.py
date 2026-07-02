@@ -22,5 +22,6 @@ from patients import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('dashboard/', patient_dashboard_view, name='patient_dashboard'),
-    path('chatbot/', views.chatbot_response_view, name='chatbot_response'),
+    path('chatbot/', views.chatbot_view, name='chatbot_endpoint'),
+    path('upload/', views.upload_excel_view, name='upload_excel'),
 ]
