@@ -1,5 +1,6 @@
 db.sqlite3
-   *.pyc
-   __pycache__/
-   .DS_Storesymptom_classifier_model.pkl
+*.pyc
+__pycache__/
+.DS_Store
 *.pkl
+
