@@ -1,54 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Patient Data | Health Navigator</title>
-    <!-- Tailwind CSS Styling Engine -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-slate-900 min-h-screen flex items-center justify-center p-6 text-slate-200">
 
     <div class="max-w-xl w-full bg-slate-950 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
-        
-        <!-- Header -->
+
         <div class="text-center space-y-2">
             <h1 class="text-2xl font-bold tracking-wide text-white">Ingest Patient Records</h1>
-            <p class="text-xs text-slate-400">Upload your target .xlsx or .xls file to populate the 2,000-record matrix</p>
+            <p class="text-xs text-slate-400">Upload datasets to live-update charts and retrain diagnostic AI models</p>
         </div>
 
-        <!-- System Message Alerts (Django Messages) -->
         {% if messages %}
-            <div class="space-y-2 text-xs font-mono">
-                {% for message in messages %}
-                    <div class="p-3 rounded-lg border {% if message.tags == 'success' %}bg-emerald-950/40 border-emerald-500/50 text-emerald-400{% else %}bg-rose-950/40 border-rose-500/50 text-rose-400{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
+        <div class="space-y-2 text-xs font-mono">
+            {% for message in messages %}
+            <div
+                class="p-3 rounded-lg border {% if message.tags == 'success' %}bg-emerald-950/40 border-emerald-500/50 text-emerald-400{% else %}bg-rose-950/40 border-rose-500/50 text-rose-400{% endif %}">
+                {{ message }}
             </div>
+            {% endfor %}
+        </div>
         {% endif %}
 
-        <!-- Core Upload Form Layout -->
-        <form action="" method="POST" enctype="multipart/form-data" class="space-y-6">
+        <form action="{% url 'upload_excel' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
             {% csrf_token %}
-            
-            <!-- 📁 The File Drop Target Box -->
-            <label for="excel_file" class="group relative block w-full border-2 border-dashed border-slate-800 hover:border-indigo-500/60 rounded-xl p-8 text-center cursor-pointer transition-all bg-slate-900/40 hover:bg-slate-900/80">
-                
-                <!-- 🛡️ CRITICAL FIX: The actual file input element is fully overlaying the box -->
+
+            <label for="excel_file"
+                class="group relative block w-full border-2 border-dashed border-slate-800 hover:border-indigo-500/60 rounded-xl p-8 text-center cursor-pointer transition-all bg-slate-900/40 hover:bg-slate-900/80">
+
                 <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required
-                       class="absolute inset-0 opacity-0 cursor-pointer z-10"
-                       onchange="updateFileName(this)">
+                    class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="updateFileName(this)">
 
                 <div class="space-y-3 pointer-events-none">
-                    <!-- Icon -->
                     <div class="text-slate-500 group-hover:text-indigo-400 transition-colors flex justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <!-- Indicator Text -->
-                    <div id="file-label-text" class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
+                    <div id="file-label-text"
+                        class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
                         Click here or drag to select your Excel Spreadsheet
                     </div>
                     <div class="text-xs text-slate-500">
@@ -57,25 +55,58 @@
                 </div>
             </label>
 
-            <!-- Submission Trigger Button Tray -->
             <div class="flex items-center space-x-4">
-                <a href="/dashboard/" class="flex-1 text-center bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-sm px-4 py-3 rounded-xl transition-colors">
+                <a href="{% url 'patient_dashboard' %}"
+                    class="flex-1 text-center bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-sm px-4 py-3 rounded-xl transition-colors">
                     Back to Console
                 </a>
-                <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-4 py-3 rounded-xl transition-all shadow-md hover:scale-[1.01] active:scale-95">
+                <button type="submit"
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-4 py-3 rounded-xl transition-all shadow-md hover:scale-[1.01] active:scale-95">
                     Process & Load Records
                 </button>
             </div>
         </form>
+
+        <div class="pt-4 border-t border-slate-900 space-y-3">
+            <div class="text-xs font-semibold tracking-wider text-indigo-400 uppercase flex items-center gap-2">
+                <span>📋 Mandatory Column Layout Requirement</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-lg">
+                    <span class="text-slate-400">🆔 MRN Key:</span> <code
+                        class="text-rose-400 font-mono font-bold">patient_id</code> / <code
+                        class="text-rose-400 font-mono font-bold">mrn</code>
+                </div>
+                <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-lg">
+                    <span class="text-slate-400">👤 Full Name:</span> <code
+                        class="text-rose-400 font-mono font-bold">patient_name</code>
+                </div>
+                <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-lg">
+                    <span class="text-slate-400">📅 Birth Date:</span> <code
+                        class="text-rose-400 font-mono font-bold">date_of_birth</code>
+                </div>
+                <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-lg">
+                    <span class="text-slate-400">🏥 Admission:</span> <code
+                        class="text-rose-400 font-mono font-bold">date_of_admission</code>
+                </div>
+                <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-lg">
+                    <span class="text-slate-400">🩺 Diagnosis:</span> <code
+                        class="text-rose-400 font-mono font-bold">primary_diagnosis</code>
+                </div>
+                <div class="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded-lg">
+                    <span class="text-slate-400">👨‍⚕️ Clinician:</span> <code
+                        class="text-rose-400 font-mono font-bold">attending_physician</code>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- ⚙️ JavaScript UI Interface String Interceptor Name Sync -->
     <script>
         function updateFileName(input) {
             const labelText = document.getElementById('file-label-text');
             if (input.files && input.files.length > 0) {
                 const name = input.files[0].name;
-                // Swap instruction label text to explicitly highlight selected file name!
                 labelText.innerHTML = `📄 Selected File: <span class="text-indigo-400 font-mono text-xs font-bold break-all">${name}</span>`;
             } else {
                 labelText.innerText = "Click here or drag to select your Excel Spreadsheet";
@@ -83,4 +114,5 @@
         }
     </script>
 </body>
+
 </html>

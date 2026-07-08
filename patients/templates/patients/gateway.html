@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to HealthNavigator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-card: #151b26;
+            --border-color: #242f41;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-doctor: #0284c7;
+            /* Professional Blue */
+            --accent-patient: #10b981;
+            /* Caring Emerald */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Split Screen Container */
+        .gateway-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .portal-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 4rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* Doctor Side Style */
+        .doctor-panel {
+            background: linear-gradient(135deg, #0f172a 0%, #0b0f19 100%);
+            border-right: 1px solid var(--border-color);
+        }
+
+        /* Patient Side Style */
+        .patient-panel {
+            background: linear-gradient(135deg, #061f14 0%, #0b0f19 100%);
+        }
+
+        /* Interactive Hover Scaling Effects */
+        .portal-panel:hover {
+            flex: 1.1;
+        }
+
+        .doctor-panel:hover {
+            box-shadow: inset -20px 0 80px rgba(2, 132, 199, 0.1);
+        }
+
+        .patient-panel:hover {
+            box-shadow: inset 20px 0 80px rgba(16, 185, 129, 0.1);
+        }
+
+        .icon-wrapper {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background-color: var(--bg-card);
+            transition: transform 0.3s ease;
+        }
+
+        .portal-panel:hover .icon-wrapper {
+            transform: scale(1.1);
+        }
+
+        .doctor-panel .icon-wrapper {
+            color: var(--accent-doctor);
+            border-color: rgba(2, 132, 199, 0.3);
+        }
+
+        .patient-panel .icon-wrapper {
+            color: var(--accent-patient);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin: 0 0 1rem 0;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        p {
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 340px;
+            margin: 0 0 2rem 0;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .btn {
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            border: none;
+        }
+
+        .doctor-btn {
+            background-color: var(--accent-doctor);
+            color: white;
+        }
+
+        .doctor-btn:hover {
+            background-color: #0369a1;
+            transform: translateY(-2px);
+        }
+
+        .patient-btn {
+            background-color: var(--accent-patient);
+            color: white;
+        }
+
+        .patient-btn:hover {
+            background-color: #059669;
+            transform: translateY(-2px);
+        }
+
+        .brand-center {
+            position: absolute;
+            top: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            text-align: center;
+        }
+
+        .brand-center h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            letter-spacing: 0.05em;
+            font-weight: 800;
+            background: linear-gradient(to right, #fff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="brand-center">
+        <h1>HEALTHNAVIGATOR PLATFORM</h1>
+    </div>
+
+    <div class="gateway-container">
+        <a href="{% url 'login' %}?role=doctor" class="portal-panel doctor-panel">
+            <div class="icon-wrapper">👨‍⚕️</div>
+            <h2>Clinical Portal</h2>
+            <p>Access telemetry HUD, ingest patient metrics datasets, monitor forecasting distributions, and supervise
+                predictive AI retraining.</p>
+            <span class="btn doctor-btn">Staff Authentication</span>
+        </a>
+
+        <a href="{% url 'chatbot_interface' %}" class="portal-panel patient-panel">
+            <div class="icon-wrapper">🤒</div>
+            <h2>Patient Care Portal</h2>
+            <p>Consult with the AI Medical Assistant regarding immediate symptoms, view triage classifications, or
+                access primary health updates.</p>
+            <span class="btn patient-btn">Enter Portal</span>
+        </a>
+    </div>
+
+</body>
+
+</html>

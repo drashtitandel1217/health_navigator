@@ -1,3 +1,4 @@
+from sklearn.utils import _metadata_requests
 from django.shortcuts import render,redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
@@ -43,8 +44,6 @@ def patient_dashboard_view(request):
     
     # Send that data package into your HTML template layout
     context = {
-        'patients': all_patients,
-        'total_records': total_records,
         'total_records_formatted': f"{total_records:,}",
         'bladder_pct': bladder_pct,
         'colorectal_pct': colorectal_pct,
@@ -52,8 +51,12 @@ def patient_dashboard_view(request):
     }
     return render(request, 'patients/dashboard.html', context)
 
+from .utils import load_model_binaries 
 
 def upload_excel_view(request):
+    # Initialize the tracking counter at the absolute top of the scope
+    records_created = 0
+    
     if request.method == "POST" and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
         
@@ -63,14 +66,9 @@ def upload_excel_view(request):
         
         try:
             df = pd.read_excel(excel_file)
-            
-            # Clean column headers: Strip whitespace and make lowercase to prevent mismatches
             df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
             
-            records_created = 0
-            
             for index, row in df.iterrows():
-                # Rebuilt fault-tolerant MRN lookup to process rows even if headers shift
                 mrn_source = (
                     row.get('medical_record_number') or 
                     row.get('mrn') or 
@@ -81,14 +79,12 @@ def upload_excel_view(request):
                 mrn = str(mrn_source).strip().upper() if pd.notnull(mrn_source) else ''
                 name = str(row.get('patient_name', row.get('name', 'Unknown'))).strip()
                 
-                # Dynamic Safe Identification Generator fallback
                 if not mrn or mrn in ['NAN', '', 'NONE']:
                     if name and name != 'Unknown':
                         mrn = f"{name.replace(' ', '_').upper()}_{index}"
                     else:
-                        continue  # Discard if the row contains zero patient identifiers
+                        continue
                 
-                # Dates tracking safely processed
                 dob = pd.to_datetime(row.get('date_of_birth'), errors='coerce')
                 adm = pd.to_datetime(row.get('date_of_admission'), errors='coerce')
                 dis = pd.to_datetime(row.get('date_of_discharge'), errors='coerce')
@@ -100,7 +96,6 @@ def upload_excel_view(request):
                 if not physician or physician.lower() in ['nan', 'none', 'unknown']:
                     physician = "Unassigned / General Triage"
 
-                # Update or save new rows safely into SQLite
                 ExcelPatientRecord.objects.update_or_create(
                     medical_record_number=mrn,
                     defaults={
@@ -115,23 +110,42 @@ def upload_excel_view(request):
                 )
                 records_created += 1
             
-            # Retrain the Random Forest model on the expanded dataset
+            # ==========================================================
+            # 🔥 STEP 2: RETRAIN BOTH AI PIPELINES & HOT-RELOAD
+            # ==========================================================
             try:
+                # 1. Run the length of stay training
                 from train_model import train_predictive_ai
-                from .utils import load_model_binaries
+                print("🏋️‍♂️ Retraining Length of Stay Regressor...")
                 train_predictive_ai()
+                
+                # 2. 🎯 FORCED RELOAD BYPASS: Clear Python module caching barriers
+                print("🏋️‍♂️ Purging cache and reloading Random Forest Symptom Classifier...")
+                import importlib
+                import train_classifier
+                
+                # Force Python to reload the module freshly from disk
+                importlib.reload(train_classifier)
+                
+                # Execute the native data extraction and pipeline fitting
+                train_classifier.run_symptom_retraining_pipeline()
+                
+                # 3. Hot-reload the fresh model weights straight into server RAM cache
                 load_model_binaries()
-                messages.success(request, f"🚀 Success! Successfully parsed and updated {records_created} patient metrics directly into SQLite database. The Random Forest model has been automatically retrained on the updated dataset.")
-            except Exception as train_err:
-                messages.success(request, f"🚀 Success! Successfully parsed and updated {records_created} patient metrics directly into SQLite database. (Note: Automatic retraining failed: {str(train_err)})")
+                
+                messages.success(request, f"🚀 Success! Parsed {records_created} records. Both AI pipelines have been automatically retrained and hot-reloaded!")
             
-            return redirect('patient_dashboard')
+            except Exception as train_err:
+                print(f"❌ Retraining Error details: {str(train_err)}")
+                messages.success(request, f"🚀 Success! Parsed {records_created} records. (Note: Multi-model retraining failed: {str(train_err)})")
+                return redirect('patient_dashboard')
 
         except Exception as e:
             messages.error(request, f"❌ Excel Parser Parsing Exception Error: {str(e)}")
             
     return render(request, 'patients/upload.html')
 
+# 📋 1. ROBUST MEDICAL STOP WORDS LIST
 # 📋 1. ROBUST MEDICAL STOP WORDS LIST
 STOP_WORDS = {
     "a", "about", "an", "and", "are", "as", "at", "be", "by", "complain", "complaining", 
@@ -184,9 +198,7 @@ def chatbot_view(request):
                     processed_input_text="greeting",
                     ai_response_reply=reply_text
                 )
-                return JsonResponse({
-                    'reply': reply_text
-                })
+                return JsonResponse({'reply': reply_text})
 
             # ==========================================================
             # 📋 LAYER 0.5: PATIENT METADATA & LENGTH OF STAY FORECAST
@@ -194,9 +206,8 @@ def chatbot_view(request):
             has_forecast_keywords = any(w in lower_message for w in ["stay", "forecast", "timeline", "discharge", "days", "predict", "hospital", "duration", "length"])
             has_mrn = bool(re.search(r"\b[a-zA-Z]\d{3}\b", raw_message))
             
-            # Use spaCy to detect PERSON entities if loaded
             has_person = False
-            if nlp:
+            if 'nlp' in globals() and nlp:
                 doc = nlp(raw_message)
                 has_person = any(ent.label_ == "PERSON" for ent in doc.ents)
                 
@@ -251,100 +262,94 @@ def chatbot_view(request):
                 engine_used = "Static Intent Engine"
 
             # ==========================================================
-            # 🗄️ LAYER 2: ADVANCED CLINICAL SEARCH (Runs if Layer 1 fails)
+            # 🤖 LAYER 2: MACHINE LEARNING INTENT CLASSIFICATION ENGINE
             # ==========================================================
             else:
-                engine_used = "Synonym-Expanded Database Search"
-                
-                # --- FIX 1: Ignore single letters like 't' or 's' from contractions ---
-                base_tokens = [t for t in raw_tokens if len(t) > 2 and t not in STOP_WORDS]
-                
-                search_terms = list(base_tokens)
-                for user_phrase, clinical_terms in SYNONYM_MAP.items():
-                    if user_phrase in lower_message:
-                        search_terms.extend(clinical_terms)
-                
-                search_terms = list(set(search_terms))
-
-                # Dynamic matching flags
-                has_lung_signals = any(k in search_terms for k in ["cough", "blood", "hemoptysis", "chest", "breath", "hoarseness", "lung", "nsclc"])
-                has_urinary_signals = any(k in search_terms for k in ["urine", "hematuria", "urination", "bladder"])
-                has_bowel_signals = any(k in search_terms for k in ["stool", "poop", "melena", "colorectal", "abdominal"])
-
-                matched_record = None
-
-                # --- FIX 2: Explicit Isolated Query Targets ---
-                if has_lung_signals:
-                    # Enforce that it MUST contain lung markers and CANNOT contain bladder/cervical markers
-                    matched_record = ExcelPatientRecord.objects.filter(
-                        (Q(primary_diagnosis__icontains="lung") | Q(primary_diagnosis__icontains="nsclc")),
-                        ~Q(primary_diagnosis__icontains="bladder"),
-                        ~Q(primary_diagnosis__icontains="cervical")
-                    ).first()
+                try:
+                    intent_classifier_pipeline = load_model_binaries()
                     
-                elif has_urinary_signals:
-                    matched_record = ExcelPatientRecord.objects.filter(primary_diagnosis__icontains="bladder").first()
-                    
-                elif has_bowel_signals:
-                    matched_record = ExcelPatientRecord.objects.filter(primary_diagnosis__icontains="colorectal").first()
-
-                # --- FIX 3: TARGETED KEYWORD FALLBACK MAPPING ---
-                # If target systems yield nothing, search key descriptive terms directly across summaries
-                if not matched_record:
-                    fallback_filter = Q()
-                    # Isolate descriptive tokens that carry precise diagnostic weight
-                    critical_landmarks = [t for t in search_terms if t in ["hoarseness", "shortness", "breath", "neck", "collarbone", "chest", "sweats"]]
-                    
-                    if critical_landmarks:
-                        for term in critical_landmarks:
-                            fallback_filter |= Q(medical_history_summary__icontains=term)
-                            fallback_filter |= Q(primary_diagnosis__icontains=term)
+                    if intent_classifier_pipeline is not None:
+                        display_tokens = [t for t in raw_tokens if len(t) > 2 and t not in STOP_WORDS]
+                        processed_text = " ".join(display_tokens)
                         
-                        # Apply context limits if lung signals were originally caught
-                        if has_lung_signals:
-                            fallback_filter &= (Q(primary_diagnosis__icontains="lung") | Q(primary_diagnosis__icontains="nsclc"))
+                        if processed_text.strip():
+                            prediction = intent_classifier_pipeline.predict([processed_text])[0]
+                            predicted_diagnosis = str(prediction)
+                            engine_used = "Random Forest Intent Classification Engine"
+                        else:
+                            predicted_diagnosis = "General Triage Consultation Required"
+                            engine_used = "System Default Fallback (Insufficient Input)"
+                    else:
+                        predicted_diagnosis = "General Triage Consultation Required"
+                        engine_used = "System Default Fallback (Model Binary Missing)"
                         
-                        matched_record = ExcelPatientRecord.objects.filter(fallback_filter).first()
-
-                # Final string processing assignment
-                if matched_record:
-                    predicted_diagnosis = matched_record.primary_diagnosis
-                else:
+                except Exception as ml_err:
+                    print(f"🔥 MACHINE LEARNING ROUTE ERROR: {str(ml_err)}")
                     predicted_diagnosis = "General Triage Consultation Required"
-                    engine_used = "System Default Fallback"
+                    engine_used = f"System Default Fallback (ML Processing Error)"
 
             # ==========================================================
             # 🎨 LAYER 3: LAYOUT WRAPPER & SEVERE LABEL DISCLAIMER
             # ==========================================================
-            severe_labels = ["cancer", "tumor", "carcinoma", "stage iii", "metastasis", "nsclc"]
-            is_severe = any(word in predicted_diagnosis.lower() for word in severe_labels)
+            if "Fallback" in engine_used or predicted_diagnosis == "General Triage Consultation Required":
+                reply_text = (
+                    "Hello! Thank you for reaching out to the Care Portal.\n\n"
+                    "I reviewed the symptoms you described, but I want to be completely thorough and precise."
+                    "To give you the most accurate triage recommendation, could you tell me a little more? "
+                    "For instance, how long have you felt this way, or are there any other signs you are experiencing?\n\n"
+                )
             
-            # Build clean display text token arrays
+            # 2. 🟢 SUCCESS: SYSTEM FOUND A MATCHING METRIC TRACK
+            else:
+                # Set up structured care content blocks based on the department matched
+                track_lower = predicted_diagnosis.lower()
+                
+                if "orthopedic" in track_lower or "fracture" in track_lower or "tibia" in track_lower:
+                    diagnosis_title = "Orthopedic Trauma Triage Protocol"
+                    cure_plan = "Immediate physical stabilization. Requires radiological diagnostic imaging (X-Ray/CT Scan) to assess structural displacement, followed by casting or orthopedic surgical intervention."
+                    precautions = "Immobilize the affected limb entirely. Avoid placing any weight on the leg. Elevate the extremity above heart level to control swelling, and apply ice packs wrapped in cloth."
+                    
+                elif "gastro" in track_lower or "gerd" in track_lower or "stomach" in track_lower:
+                    diagnosis_title = "Gastroenterology Triage Track"
+                    cure_plan = "Clinical evaluation for acid suppression therapy (such as H2 receptor antagonists or Proton Pump Inhibitors like Omeprazole). Dietary mapping to identify gastrointestinal trigger thresholds."
+                    precautions = "Avoid lying down for at least 3 hours immediately following a meal. Elevate the head of your bed by 6 inches. Avoid spicy, highly acidic, fatty foods, caffeine, or carbonated beverages."
+                    
+                elif "neuro" in track_lower or "migraine" in track_lower or "headache" in track_lower:
+                    diagnosis_title = "Neurology Consultation Track"
+                    cure_plan = "Therapeutic acute relief intervention (such as triptans or targeted NSAIDs). For chronic patterns, prophylactic maintenance therapy may be evaluated by a neurologist."
+                    precautions = "Rest in a quiet, completely darkened room at the onset of symptoms. Keep a detailed log of potential lifestyle triggers (e.g., specific foods, shifting sleep patterns, blue-light exposure)."
+                    
+                else:
+                    # Dynamic Default for general database categories (including Oncology rows)
+                    diagnosis_title = f"{predicted_diagnosis} Clinical Review"
+                    cure_plan = "Requires an advanced clinical workup, formal pathology analysis, and blood panel tracking directed by an attending department specialist."
+                    precautions = "Closely document the progression, intensity, and timing of your symptoms. Bring any historical laboratory reports or current medication schedules to your next formal consultation."
+
+                # Compile the clean, elegant markdown message structure
+                reply_text = (
+                    f"Symptoms of:\n`{diagnosis_title}`\n\n"
+                    f"Cure recommended:\n"
+                    f"{cure_plan}\n\n"
+                    f"Precautions:\n"
+                    f"{precautions}\n\n"
+                
+                )
+
             display_tokens = [t for t in raw_tokens if len(t) > 2 and t not in STOP_WORDS]
             processed_message = ", ".join(display_tokens) if display_tokens else "None"
 
-            if is_severe and engine_used != "Static Intent Engine":
-                reply_text = (
-                    f"🩺 Advanced Assessment: `{predicted_diagnosis}`\n\n"
-                    f"Next Steps: Please consult an attending specialist immediately for expert verification.\n\n"
-                )
-            else:
-                reply_text = (
-                    f"🎯 Suggested Track:`{predicted_diagnosis}`\n\n"
-                    f"⚠️ Disclaimer: Generated via {engine_used}. Consult a physician.\n\n"
-                    f"• Symptoms: `{processed_message}`"
-                )
-
-            # Log the inquiry
+            # Record metrics inside historical SQLite database logs safely
             ChatbotInquiryLog.objects.create(
                 raw_input_text=raw_message,
-                processed_input_text=processed_message,
+                processed_input_text=processed_message, # 👈 Now completely defined!
                 ai_response_reply=reply_text
             )
 
             return JsonResponse({'reply': reply_text})
             
         except Exception as e:
-            return JsonResponse({'error': f"NLP Exception: {str(e)}"}, status=500)
+            return JsonResponse({'error': f"NLP Exception Handling Request: {str(e)}"}, status=500)
             
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
+
+

@@ -89,3 +89,4 @@ class ChatbotInquiryLog(models.Model):
     class Meta:
         verbose_name = "Chatbot Inquiry Log"
         verbose_name_plural = "Chatbot Inquiry Logs"
+

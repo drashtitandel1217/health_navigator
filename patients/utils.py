@@ -55,13 +55,29 @@ model = None
 preprocessor = None
 
 def load_model_binaries():
-    global model, preprocessor
-    try:
-        model = joblib.load(MODEL_PATH)
-        preprocessor = joblib.load(PREPROCESSOR_PATH)
-    except Exception as e:
-        print(f"⚠️ Model load warning: {e}")
-        model, preprocessor = None, None
+    # 📂 1. Get the directory path where utils.py lives (health_navigator_main/patients/)
+    current_utils_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 📂 2. Move up one parent level to hit your project root directory (health_navigator_main/)
+    project_root_dir = os.path.dirname(current_utils_dir)
+    
+    # 🎯 3. Lock down the absolute location of the model binary at the root level
+    model_path = os.path.join(project_root_dir, 'symptom_classifier_model.pkl')
+
+    # Quick terminal debug log to monitor server behavior
+    print(f"🔍 System attempting to load model weights from: {model_path}")
+
+    if os.path.exists(model_path):
+        try:
+            loaded_pipeline = joblib.load(model_path)
+            print("🤖 Success: Random Forest Intent Weights loaded perfectly into memory cache!")
+            return loaded_pipeline
+        except Exception as read_err:
+            print(f"❌ Error while reading .pkl file structure: {str(read_err)}")
+            return None
+    else:
+        print("⚠️ Warning: File lookup failed. symptom_classifier_model.pkl is missing from root.")
+        return None
 
 load_model_binaries()
 
@@ -72,7 +88,12 @@ def predict_patient_stay(patient_object):
     """
     global model, preprocessor
     if model is None or preprocessor is None:
-        load_model_binaries()
+        if os.path.exists(MODEL_PATH) and os.path.exists(PREPROCESSOR_PATH):
+            try:
+                model = joblib.load(MODEL_PATH)
+                preprocessor = joblib.load(PREPROCESSOR_PATH)
+            except Exception as e:
+                print(f"Error loading stay forecasting model/preprocessor: {e}")
     if not model or not preprocessor:
         return "Model binaries (.pkl) are missing or not loaded correctly."
 
