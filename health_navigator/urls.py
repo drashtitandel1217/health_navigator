@@ -24,4 +24,6 @@ urlpatterns = [
     path('dashboard/', patient_dashboard_view, name='patient_dashboard'),
     path('chatbot/', views.chatbot_view, name='chatbot_endpoint'),
     path('upload/', views.upload_excel_view, name='upload_excel'),
+    path('api/self-check/', views.self_check_diet_engine_view, name='self_check_api'),
+
 ]

@@ -90,3 +90,22 @@ class ChatbotInquiryLog(models.Model):
         verbose_name = "Chatbot Inquiry Log"
         verbose_name_plural = "Chatbot Inquiry Logs"
 
+class UserSelfCheckMetric(models.Model):
+    GENDER_CHOICES = [('M', 'Male'), ('F', 'Female'), ('O', 'Other')]
+    GOAL_CHOICES = [('LOSE', 'Weight Loss'), ('MAINTAIN', 'Maintenance'), ('GAIN', 'Muscle Gain')]
+
+    age = models.IntegerField()
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
+    height_cm = models.FloatField()
+    weight_kg = models.FloatField()
+    fitness_goal = models.CharField(max_length=10, choices=GOAL_CHOICES)
+    
+    # AI System Generated Outputs
+    calculated_bmi = models.FloatField(blank=True, null=True)
+    bmi_category = models.CharField(max_length=30, blank=True, null=True)
+    recommended_calories = models.IntegerField(blank=True, null=True)
+    diet_plan_markdown = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Self Check - {self.timestamp.strftime('%Y-%m-%d')}"

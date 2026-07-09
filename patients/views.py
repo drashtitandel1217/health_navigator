@@ -12,6 +12,7 @@ import os
 from django.conf import settings
 import joblib
 from django.db.models import Q
+from .models import UserSelfCheckMetric
 
 # Create your views here.
 from .models import ExcelPatientRecord,ChatbotInquiryLog
@@ -352,4 +353,67 @@ def chatbot_view(request):
             
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
+
+def self_check_diet_engine_view(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        
+        weight = float(data.get('weight', 0))
+        height = float(data.get('height', 0))
+        age = int(data.get('age', 0))
+        gender = data.get('gender', 'M')
+        goal = data.get('goal', 'MAINTAIN')
+        
+        # 1. Math computation equations
+        height_m = height / 100.0
+        bmi = round(weight / (height_m ** 2), 1)
+        
+        if bmi < 18.5:
+            bmi_tier = "Underweight"
+        elif bmi < 25.0:
+            bmi_tier = "Normal Weight"
+        elif bmi < 30.0:
+            bmi_tier = "Overweight"
+        else:
+            bmi_tier = "Obese"
+            
+        # 2. Compute BMR
+        if gender == 'M':
+            bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
+        else:
+            bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
+            
+        # TDEE basic multiplier assuming moderate activity
+        tdee = bmr * 1.375
+        
+        # 3. Target Calorie adjustment based on target goals
+        if goal == "LOSE":
+            target_calories = int(tdee - 500)
+            macro_split = "🥩 High Protein / Moderate Carb split (40% P / 30% C / 30% F)"
+            meals = "• Breakfast: Egg whites scramble with spinach\n• Lunch: Grilled chicken breast with broccoli\n• Dinner: Baked salmon with asparagus"
+        elif goal == "GAIN":
+            target_calories = int(tdee + 400)
+            macro_split = "🥑 High Calorie / Clean Bulking split (30% P / 40% C / 30% F)"
+            meals = "• Breakfast: Oatmeal with peanut butter and banana\n• Lunch: Lean beef with brown rice\n• Dinner: Roasted turkey breast with sweet potatoes"
+        else:
+            target_calories = int(tdee)
+            macro_split = "🥗 Balanced Nutrition Maintenance profile (30% P / 45% C / 25% F)"
+            meals = "• Breakfast: Greek yogurt with mixed berries\n• Lunch: Quinoa salad with mixed greens and tofu\n• Dinner: Lean white fish with mixed vegetables"
+
+        diet_plan = f"📊 **Macronutrient Profile**: {macro_split}\n\n🍏 **Suggested Meal Structure**:\n{meals}"
+
+        # 4. Save into SQLite history trace logs
+        UserSelfCheckMetric.objects.create(
+            age=age, gender=gender, height_cm=height, weight_kg=weight, fitness_goal=goal,
+            calculated_bmi=bmi, bmi_category=bmi_tier, recommended_calories=target_calories, diet_plan_markdown=diet_plan
+        )
+
+        return JsonResponse({
+            'bmi': bmi,
+            'category': bmi_tier,
+            'calories': target_calories,
+            'diet_plan': diet_plan
+        })
+        
+    return JsonResponse({'error': 'Direct interface browser GET requests not supported on this data endpoint lines.'}, status=400)
 

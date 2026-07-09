@@ -86,14 +86,18 @@
         <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-primary-fixed-dim"
                 data-icon="clinical_notes">clinical_notes</span>
-            <h1 class="font-headline-md text-[18px] tracking-tighter uppercase text-primary-fixed-dim">TELEMETRY CONSOLE
-                V.2.4 ACTIVE</h1>
+            <h1 class="font-headline-md text-[18px] tracking-tighter uppercase text-primary-fixed-dim">HEALTH NAVIGATOR
+            </h1>
         </div>
 
         <div class="flex items-center gap-6">
             <button onclick="openIngestModal()"
                 class="clipped-btn flex items-center gap-2 bg-primary-fixed-dim/10 border border-primary-fixed-dim/40 px-4 py-1.5 text-primary-fixed-dim text-[11px] uppercase font-bold tracking-wider hover:bg-primary-fixed-dim hover:text-slate-950 transition-all">
                 <span class="material-symbols-outlined text-[14px]">upload_file</span> INGEST_MATRIX
+            </button>
+            <button onclick="openSelfCheckModal()"
+                class="clipped-btn flex items-center gap-2 bg-secondary/10 border border-secondary/40 px-4 py-1.5 text-secondary text-[11px] uppercase font-bold tracking-wider hover:bg-secondary hover:text-slate-950 transition-all">
+                <span class="material-symbols-outlined text-[14px]">ecg</span> SELF_CHECK_PLANNER
             </button>
             <div class="flex flex-col items-end">
                 <span class="text-[10px] text-outline uppercase font-bold tracking-widest">System Latency</span>
@@ -123,7 +127,7 @@
                 <div class="flex justify-between items-start mb-6">
                     <div>
                         <h2 class="font-display-lg text-[24px] uppercase tracking-tighter text-primary-fixed-dim">
-                            CLINICAL TELEMETRY LEDGER</h2>
+                            CLINICAL DIAGNOSIS</h2>
                         <p class="text-outline text-[12px]">INTERACTION_LOG: SECURE_CHANNEL</p>
                     </div>
                     <div
@@ -169,6 +173,7 @@
                             </circle>
                         </svg>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="font-display-lg text-[32px] text-white"></span>
                             <span class="text-outline text-[10px] uppercase font-bold">RECORDS</span>
                         </div>
                     </div>
@@ -280,6 +285,75 @@
         </div>
     </div>
 
+    <div id="self-check-modal"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-plate w-full max-w-xl p-8 space-y-6 m-4 shadow-2xl relative">
+            <div class="flex justify-between items-center border-b border-outline-variant/30 pb-4">
+                <div>
+                    <h3 class="font-headline-md text-[18px] text-primary-fixed-dim tracking-wider uppercase">■ PERSONAL
+                        HEALTH PLANNER</h3>
+                    <p class="text-[10px] text-outline uppercase mt-1">AI Diagnostic Engine Endpoint Profile</p>
+                </div>
+                <button onclick="closeSelfCheckModal()"
+                    class="text-outline hover:text-white transition-colors text-lg font-bold">✕</button>
+            </div>
+
+            <div class="space-y-4 text-xs font-mono">
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-outline block mb-1">HEIGHT (CM)</label>
+                        <input type="number" id="sc-height"
+                            class="w-full bg-surface-container border border-outline-variant/30 text-white rounded p-2 focus:ring-1 focus:ring-primary-fixed-dim">
+                    </div>
+                    <div>
+                        <label class="text-outline block mb-1">WEIGHT (KG)</label>
+                        <input type="number" id="sc-weight"
+                            class="w-full bg-surface-container border border-outline-variant/30 text-white rounded p-2 focus:ring-1 focus:ring-primary-fixed-dim">
+                    </div>
+                    <div>
+                        <label class="text-outline block mb-1">AGE</label>
+                        <input type="number" id="sc-age"
+                            class="w-full bg-surface-container border border-outline-variant/30 text-white rounded p-2 focus:ring-1 focus:ring-primary-fixed-dim">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-outline block mb-1">GENDER</label>
+                        <select id="sc-gender"
+                            class="w-full bg-surface-container border border-outline-variant/30 text-white rounded p-2 focus:ring-1 focus:ring-primary-fixed-dim">
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-outline block mb-1">TARGET GOAL</label>
+                        <select id="sc-goal"
+                            class="w-full bg-surface-container border border-outline-variant/30 text-white rounded p-2 focus:ring-1 focus:ring-primary-fixed-dim">
+                            <option value="LOSE">Weight Loss</option>
+                            <option value="MAINTAIN">Maintenance</option>
+                            <option value="GAIN">Muscle Gain</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="executeSelfCheck()"
+                    class="w-full clipped-btn bg-cyan-500/10 border border-cyan-500 py-2.5 text-cyan-400 uppercase tracking-wider font-bold hover:bg-cyan-500 hover:text-slate-950 transition-all">
+                    GENERATE_DIET_MATRIX
+                </button>
+
+                <div id="sc-output"
+                    class="hidden p-4 bg-slate-950/80 border border-slate-800 rounded space-y-2 text-white">
+                    <div class="text-secondary font-bold uppercase">[AI ANALYSIS MATRIX GENERATED]:</div>
+                    <p>• BMI Score: <span id="out-bmi" class="text-primary-fixed-dim"></span> (<span
+                            id="out-cat"></span>)</p>
+                    <p>• Daily Target Energy: <span id="out-cal" class="text-primary-fixed-dim"></span> Calories</p>
+                    <div id="out-plan" class="border-t border-outline-variant/20 pt-2 text-outline"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const modal = document.getElementById('ingest-modal');
 
@@ -348,6 +422,48 @@
 
         sendBtn.addEventListener('click', handleSendMessage);
         chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+
+        const scModal = document.getElementById('self-check-modal');
+
+        function openSelfCheckModal() {
+            scModal.classList.remove('hidden');
+            setTimeout(() => { scModal.classList.add('opacity-100'); }, 10);
+        }
+
+        function closeSelfCheckModal() {
+            scModal.classList.remove('opacity-100');
+            setTimeout(() => { scModal.classList.add('hidden'); }, 300);
+            document.getElementById('sc-output').classList.add('hidden');
+        }
+
+        async function executeSelfCheck() {
+            const payload = {
+                height: document.getElementById('sc-height').value,
+                weight: document.getElementById('sc-weight').value,
+                age: document.getElementById('sc-age').value,
+                gender: document.getElementById('sc-gender').value,
+                goal: document.getElementById('sc-goal').value,
+            };
+
+            try {
+                const response = await fetch('{% url "self_check_api" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (data.bmi) {
+                    document.getElementById('out-bmi').innerText = data.bmi;
+                    document.getElementById('out-cat').innerText = data.category;
+                    document.getElementById('out-cal').innerText = data.calories;
+                    document.getElementById('out-plan').innerHTML = data.diet_plan.replace(/\n/g, '<br>');
+                    document.getElementById('sc-output').classList.remove('hidden');
+                }
+            } catch (err) {
+                alert('Connection loop drop on network line sync.');
+            }
+        }
     </script>
 </body>
 
