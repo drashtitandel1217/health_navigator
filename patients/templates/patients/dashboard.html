@@ -335,6 +335,13 @@
                             <option value="GAIN">Muscle Gain</option>
                         </select>
                     </div>
+                    <div class="flex flex-col gap-2">
+    <label for="sc-diet-preference" class="text-primary-fixed-dim font-mono text-xs font-bold">DIETARY PREFERENCE</label>
+    <select id="sc-diet-preference" class="bg-surface-container border border-outline-variant/30 text-secondary font-mono text-sm p-2 rounded focus:outline-none focus:border-primary-fixed-dim">
+        <option value="VEG">Vegetarian (Veg)</option>
+        <option value="NON_VEG">Non-Vegetarian (Non-Veg)</option>
+    </select>
+</div>
                 </div>
 
                 <button onclick="executeSelfCheck()"
@@ -437,12 +444,17 @@
         }
 
         async function executeSelfCheck() {
+            // 🥦 Safe conditional check for the dietary preference dropdown element
+            const dietPrefElement = document.getElementById('sc-diet-preference');
+            const chosenDietPreference = dietPrefElement ? dietPrefElement.value : 'VEG';
+
             const payload = {
                 height: document.getElementById('sc-height').value,
                 weight: document.getElementById('sc-weight').value,
                 age: document.getElementById('sc-age').value,
                 gender: document.getElementById('sc-gender').value,
                 goal: document.getElementById('sc-goal').value,
+                diet_preference: chosenDietPreference // 🥗 Injected safely
             };
 
             try {
