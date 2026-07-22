@@ -49,6 +49,7 @@ GRATITUDE_WORDS  = ["thanks", "thank you", "appreciate it", "ty"]
 FAREWELL_WORDS   = ["bye", "goodbye", "see you", "later", "exit", "quit"]
 HOW_ARE_YOU      = ["how are you", "how's it going", "how you doing", "you good"]
 AFFIRM_WORDS     = ["ok", "okay", "cool", "great", "nice", "sounds good"]
+NEGATIVE_CLOSE_WORDS = ["no", "nope", "nah", "not really", "no thanks", "nothing else", "that's all", "thats all", "i'm good", "im good"]
 
 GREETING_REPLIES = [
     "Hey there! What's going on?",
@@ -77,6 +78,11 @@ AFFIRM_REPLIES = [
     "Got it.",
     "Sounds good.",
     "Alright, let me know if you need anything else.",
+]
+NEGATIVE_CLOSE_REPLIES = [
+    "Alright, take care!",
+    "Okay, have a great day — reach out anytime.",
+    "Sounds good. Wishing you well!",
 ]
 
 # --- Layer 0.5: patient lookup follow-up word banks ---
@@ -318,14 +324,12 @@ def upload_excel_view(request):
             except Exception as train_err:
                 print(f"❌ Retraining Error details: {str(train_err)}")
                 messages.success(request, f"🚀 Success! Parsed {records_created} records. (Note: Multi-model retraining failed: {str(train_err)})")
-                return redirect('patient_dashboard')
+            return redirect('patient_dashboard')
 
         except Exception as e:
             messages.error(request, f"❌ Excel Parser Parsing Exception Error: {str(e)}")
 
     return render(request, 'patients/upload.html')
-
-
 
 
 # ==========================================================
@@ -359,186 +363,255 @@ def chatbot_view(request):
         intake_data = request.session.get('intake_data', {})
 
         # ==========================================================
-        # 🏥 STATE 1: FULL DIAGNOSTIC ONBOARDING INTAKE ENGINE (RANDOMIZED MULTI-REPLY)
-        # ==========================================================
-        if any(w in lower_message for w in ["checkup", "check up", "diagnostic", "fit or not", "evaluate me", "doctor"]):
-            request.session['intake_state'] = 'AWAITING_NAME'
-            request.session['intake_data'] = {}
-            
-            init_replies = [
-                "👨‍⚕️ **[Clinical Intake Mode Engaged]**\n\nHello, I am your digital attending specialist. Let's run a complete fitness and diagnostic evaluation. To begin our medical record profile, **what is your full name?**",
-                "👨‍⚕️ **[Triage Intake Loop Initialized]**\n\nWelcome to the evaluation module. Let's gather your clinical baseline metrics. Please state your **full name** for the session registry.",
-                "👨‍⚕️ **[Attending Engine Active]**\n\nGreetings. I will guide you through a physical health review session today. To pull up the proper data matrix, **what name should I log under?**"
-            ]
-            return _log_and_reply(raw_message, "diagnostic_intake_start", random.choice(init_replies))
-
-        # ==========================================================
         # 🏥 LAYER 0: STATEFUL CLINICAL DIALOGUE INTAKE ENGINE
         # ==========================================================
-        
-        # Trigger full diagnostic onboarding session checkup
+        # Global escape intercept — checked first, before any state
+        # branching, so "exit"/"quit"/"cancel"/"reset"/"stop" always
+        # clears the session regardless of what state we're in.
         if any(w in lower_message for w in ["exit", "quit", "cancel", "reset", "stop"]):
             request.session['intake_state'] = 'IDLE'
             request.session['intake_data'] = {}
             reply_text = "🔌 **[Session Terminated]**\n\nActive dialogue pipeline cleared. Returning to primary dashboard telemetry mode."
             return _log_and_reply(raw_message, "session_forced_reset", reply_text)
-        
-        if any(w in lower_message for w in ["checkup", "check up", "diagnostic", "fit or not", "evaluate me", "doctor"]):
-            request.session['intake_state'] = 'AWAITING_NAME'
+
+        # Trigger full diagnostic onboarding session checkup.
+        # Gated on session_state == 'IDLE' so an in-progress intake
+        # (e.g. AWAITING_SYMPTOMS) can't be hijacked mid-flow just
+        # because the user's answer happens to contain a trigger word
+        # like "doctor" (e.g. "my doctor said it's just a cold").
+        if session_state == 'IDLE' and any(w in lower_message for w in ["checkup", "check up", "diagnostic", "fit or not", "evaluate me", "doctor"]):
+            request.session['intake_state'] = 'AWAITING_INTENT'
             request.session['intake_data'] = {}
-            reply_text = "Clinical Intake Mode Engaged\n\nHello, I am your digital attending specialist. Let's run a complete fitness and diagnostic evaluation. To begin our medical record profile, what is your full name?**"
+            reply_text = (
+                "👨‍⚕️ **[Clinical Intake Mode Engaged]**\n\n"
+                "Hello! I'm your Health Navigator assistant. Are you an "
+                "**existing patient** checking your records, or are you "
+                "looking for a **symptom evaluation** today?"
+            )
             return _log_and_reply(raw_message, "diagnostic_intake_start", reply_text)
 
-        elif session_state == 'AWAITING_NAME':
-            clean_name = raw_message.strip()
-            # ⛔ VALIDATION: Reject names that match basic greetings, are empty, or contain digits
-            if lower_message in GREETING_WORDS or len(clean_name) < 2 or bool(re.search(r'\d', clean_name)):
-                name_error_replies = [
-                    "📋 **Invalid Record Name**: Please enter a valid name string (letters only) for the medical chart registry.",
-                    "⚠️ **Chart Registry Error**: That input does not look like a standard patient name. Please type a valid name.",
-                    "🔍 **Intake Alert**: Please state the patient's full name explicitly to provision the diagnostic tracker log."
-                ]
-                return _log_and_reply(raw_message, "intake_name_validation_failed", random.choice(name_error_replies))
-                
-            intake_data['name'] = clean_name
-            request.session['intake_state'] = 'AWAITING_AGE'
-            request.session['intake_data'] = intake_data
-            
-            name_replies = [
-                f"Thank you, {clean_name}. Noted in the chart.\n\n**What is your age?**",
-                f"Got it, {clean_name}. Profile baseline registered.\n\n**Please provide your age next:**",
-                f"System ledger updated with name: {clean_name}.\n\nMoving forward, **how old are you?**"
-            ]
-            return _log_and_reply(raw_message, "intake_name", random.choice(name_replies))
+        # ---- Phase 1: Onboarding & Identity --------------------------------
+        elif session_state == 'AWAITING_INTENT':
+            if "existing" in lower_message or "record" in lower_message:
+                intake_data['patient_type'] = 'existing'
+                request.session['intake_state'] = 'AWAITING_VERIFICATION'
+                request.session['intake_data'] = intake_data
+                reply_text = (
+                    "Could you please provide your **full name** and **date "
+                    "of birth** so I can locate your medical record?"
+                )
+                return _log_and_reply(raw_message, "intake_intent_existing", reply_text)
+            else:
+                intake_data['patient_type'] = 'new/evaluation'
+                request.session['intake_state'] = 'AWAITING_BIOMETRICS'
+                request.session['intake_data'] = intake_data
+                reply_text = (
+                    "To ensure I give you accurate advice, could you please "
+                    "provide your **age** and **biological sex**?"
+                )
+                return _log_and_reply(raw_message, "intake_intent_new", reply_text)
 
-        elif session_state == 'AWAITING_AGE':
+        elif session_state == 'AWAITING_VERIFICATION':
+            clean_id = raw_message.strip()
+            # ⛔ VALIDATION: Reject pure greetings/affirmations, empty input,
+            # or input with no alphabetic content (a name+DOB pair needs at
+            # least a real name in it).
+            if (lower_message in GREETING_WORDS or lower_message in AFFIRM_WORDS
+                    or len(clean_id) < 3 or not re.search(r'[A-Za-z]{2,}', clean_id)):
+                id_error_replies = [
+                    "📋 **Invalid Record Lookup**: Please share your full name together with your date of birth (e.g., *Jane Doe, 1990-04-12*).",
+                    "⚠️ **Chart Registry Error**: I need both a name and date of birth to locate your record — could you send those together?",
+                    "🔍 **Intake Alert**: A greeting or blank entry won't be enough to look you up. Please provide your full name and date of birth."
+                ]
+                return _log_and_reply(raw_message, "intake_verification_validation_failed", random.choice(id_error_replies))
+            intake_data['verification_info'] = clean_id
+            request.session['intake_state'] = 'AWAITING_SYMPTOM'
+            request.session['intake_data'] = intake_data
+            reply_text = (
+                "Thanks, I've noted that for our records team to confirm.\n\n"
+                "**What brings you in today?** Please describe your main "
+                "symptoms or concerns in your own words."
+            )
+            return _log_and_reply(raw_message, "intake_verification", reply_text)
+
+        elif session_state == 'AWAITING_BIOMETRICS':
             age_match = re.search(r'\d+', lower_message)
-            # ⛔ VALIDATION: Ensure a realistic numeric age is found
-            if not age_match or not (1 <= int(age_match.group()) <= 120):
-                age_error_replies = [
-                    "🔢 **Invalid Entry**: Please provide a valid numerical value for your age (e.g., 34).",
-                    "⚠️ **Numeric Parse Failure**: Age metric must be entered as a positive integer scale. What is your age?",
-                    "📊 **Data Entry Alert**: Please state a realistic number for age so we can map your vital chart coordinates."
+            sex_match = re.search(r'\b(male|female|m|f)\b', lower_message)
+            # ⛔ VALIDATION: Require a realistic numeric age AND a recognizable sex token
+            if not age_match or not (1 <= int(age_match.group()) <= 120) or not sex_match:
+                biometrics_error_replies = [
+                    "🔢 **Invalid Entry**: Please share both your age (e.g., 34) and biological sex (male/female).",
+                    "⚠️ **Numeric Parse Failure**: I need a valid age between 1–120 and a biological sex to continue. Could you resend both?",
+                    "📊 **Data Entry Alert**: Please state a realistic age and biological sex so we can map your vital chart coordinates."
                 ]
-                return _log_and_reply(raw_message, "intake_age_validation_failed", random.choice(age_error_replies))
-                
+                return _log_and_reply(raw_message, "intake_biometrics_validation_failed", random.choice(biometrics_error_replies))
             intake_data['age'] = int(age_match.group())
-            request.session['intake_state'] = 'AWAITING_HEIGHT'
+            intake_data['biological_sex'] = sex_match.group()
+            request.session['intake_state'] = 'AWAITING_SYMPTOM'
             request.session['intake_data'] = intake_data
-            
-            age_replies = [
-                "Understood. Now, please state your **height in centimeters (cm)**.",
-                "Metric saved. What is your current **height (in cm)**?",
-                "Acknowledged. Let's check your height coordinates next. Please enter your **height in centimeters**."
-            ]
-            return _log_and_reply(raw_message, "intake_age", random.choice(age_replies))
+            reply_text = (
+                "Thank you.\n\n**What brings you in today?** Please describe "
+                "your main symptoms or concerns in your own words."
+            )
+            return _log_and_reply(raw_message, "intake_biometrics", reply_text)
 
-        elif session_state == 'AWAITING_HEIGHT':
-            height_match = re.search(r'\d+', lower_message)
-            # ⛔ VALIDATION: Ensure a realistic height value is parsed
-            if not height_match or not (50 <= float(height_match.group()) <= 270):
-                height_error_replies = [
-                    "📏 **Invalid Entry**: Please state your height explicitly using numbers (e.g., 175).",
-                    "⚠️ **Dimension Parse Error**: I couldn't extract a valid measurement value. What is your current height in centimeters (cm)?",
-                    "📊 **Metric Framework Alert**: Please input a pure numeric height value (cm) so we can map your BMI profile coordinates."
-                ]
-                return _log_and_reply(raw_message, "intake_height_validation_failed", random.choice(height_error_replies))
-                
-            intake_data['height'] = float(height_match.group())
-            request.session['intake_state'] = 'AWAITING_WEIGHT'
+        # ---- Phase 2: Chief Complaint & Symptom Capture --------------------
+        elif session_state == 'AWAITING_SYMPTOM':
+            if len(raw_message.strip()) < 3:
+                reply_text = "Could you say a bit more about what's bothering you?"
+                return _log_and_reply(raw_message, "intake_symptom_validation_failed", reply_text)
+            intake_data['primary_symptom'] = raw_message
+            request.session['intake_state'] = 'AWAITING_DURATION'
             request.session['intake_data'] = intake_data
-            
-            height_replies = [
-                "Acknowledged. Next, please provide your current **weight in kilograms (kg)**.",
-                "Height registered in centimeters. Next step: What is your **weight in kilograms (kg)**?",
-                "Got your height dimension mapped. Please provide your current **weight (in kg)** to finish the biometrics check."
-            ]
-            return _log_and_reply(raw_message, "intake_height", random.choice(height_replies))
+            reply_text = (
+                "Understood. **How long have you been experiencing these "
+                "symptoms?** (e.g., just started today, a few days, or "
+                "several weeks)"
+            )
+            return _log_and_reply(raw_message, "intake_symptom", reply_text)
 
-        elif session_state == 'AWAITING_WEIGHT':
-            weight_match = re.search(r'\d+', lower_message)
-            # ⛔ VALIDATION: Ensure a realistic weight value is parsed
-            if not weight_match or not (10 <= float(weight_match.group()) <= 300):
-                weight_error_replies = [
-                    "⚖️ **Invalid Entry**: Please provide your weight using standard digits/numbers (e.g., 70).",
-                    "⚠️ **Mass Matrix Error**: Could not parse structural numeric value. What is your weight in kilograms (kg)?",
-                    "📊 **Data Entry Alert**: Please verify and enter a pure numeric baseline matrix for your weight status parameters."
-                ]
-                return _log_and_reply(raw_message, "intake_weight_validation_failed", random.choice(weight_error_replies))
-                
-            intake_data['weight'] = float(weight_match.group())
-            request.session['intake_state'] = 'AWAITING_SYMPTOMS'
+        elif session_state == 'AWAITING_DURATION':
+            intake_data['duration'] = raw_message
+            request.session['intake_state'] = 'AWAITING_REDFLAG'
             request.session['intake_data'] = intake_data
-            
-            weight_replies = [
-                "Got it. Finally, are you currently experiencing any **symptoms or physical discomfort?** (e.g., fatigue, pelvic discomfort, changes in habits, or write 'none')",
-                "Weight metrics saved. Let's finish up: What exact **symptoms or physical discomforts** have you noticed lately? (Type 'none' if feeling fine)",
-                "Biometrics calculation data loaded. To finish the evaluation tracker, tell me about your current **symptoms or acute discomfort**."
-            ]
-            return _log_and_reply(raw_message, "intake_weight", random.choice(weight_replies))
+            reply_text = (
+                "Just to be safe — are you experiencing any **severe chest "
+                "pain, sudden difficulty breathing, confusion, or severe "
+                "bleeding**?"
+            )
+            return _log_and_reply(raw_message, "intake_duration", reply_text)
 
-        elif session_state == 'AWAITING_SYMPTOMS':
-            symptom_lower = raw_message.lower().strip()
-            
-            # Extract collected biometric variables
-            h_m = intake_data['height'] / 100.0
-            w_kg = intake_data['weight']
-            bmi = round(w_kg / (h_m ** 2), 1)
-            
-            # Biometric Weight Scale Triage
-            if bmi < 18.5:
-                fitness_status = "Underweight Status (Nutritional optimization recommended)"
-            elif bmi < 25.0:
-                fitness_status = "Excellent / Normal Weight Range (Metabolic health optimal)"
-            elif bmi < 30.0:
-                fitness_status = "Overweight Status (Cardiovascular conditioning advised)"
-            else:
-                fitness_status = "Obese Range (Clinical lifestyle counseling advised)"
-
-            # Check if user stated they have no symptoms
-            is_no_symptoms = symptom_lower in ["no", "none", "nothing", "fine", "no symptoms", "nothin", "healthy"]
-
-            if is_no_symptoms:
-                intake_data['symptoms'] = "None Reported (Patient feeling healthy)"
-                diagnostic_remark = "🟢 **Clear Ledger**: No acute oncology pathway or system telemetry symptoms flagged today. Maintenance of current routine advised."
-                
+        # ---- Phase 3: Clinical Drill-Down & Triage -------------------------
+        elif session_state == 'AWAITING_REDFLAG':
+            is_emergency = lower_message.startswith("yes") or _has_word(RED_FLAG_WORDS, lower_message)
+            if is_emergency:
+                request.session['intake_state'] = 'IDLE'
+                request.session['intake_data'] = {}
                 reply_text = (
-                    f"👨‍⚕️ **[HEALTHY BASELINE LOGGED FOR {intake_data['name'].upper()}]**\n\n"
-                    f"📊 **VITAL STATISTICS CHART**:\n"
-                    f"• **Age**: {intake_data['age']} years old\n"
-                    f"• **Biometrics**: {intake_data['height']} cm / {intake_data['weight']} kg\n"
-                    f"• **Calculated BMI**: `{bmi}`\n\n"
-                    f"🩺 **CLINICAL FITNESS EVALUATION**:\n"
-                    f"• Status: {fitness_status}\n"
-                    f"• Symptoms Reported: *\"None\"*\n"
-                    f"• Diagnostic Assessment: {diagnostic_remark}\n\n"
-                    f"✨ *Intake complete. Clean bill of health tracked. Dialogue session reset to home parameters.*"
+                    "⚠️ **Please seek emergency care right away — call 911 "
+                    "(or your local emergency number) or go to the nearest "
+                    "emergency room now.** This is more than I can safely "
+                    "help with here. I've ended this check-in so you can "
+                    "focus on getting in-person care quickly."
+                )
+                return _log_and_reply(raw_message, "intake_redflag_escalation", reply_text)
+            intake_data['red_flags'] = "none reported"
+            request.session['intake_state'] = 'AWAITING_SEVERITY'
+            request.session['intake_data'] = intake_data
+            reply_text = (
+                "Good to hear. On a scale of **1 to 10** (1 being very mild, "
+                "10 being unbearable), **how severe is your discomfort right "
+                "now?**"
+            )
+            return _log_and_reply(raw_message, "intake_redflag_clear", reply_text)
+
+        elif session_state == 'AWAITING_SEVERITY':
+            severity_match = re.search(r'\b(10|[1-9])\b', lower_message)
+            # ⛔ VALIDATION: Ensure the scale value is a valid 1–10 number
+            if not severity_match:
+                reply_text = "Could you give me a number between **1 and 10**?"
+                return _log_and_reply(raw_message, "intake_severity_validation_failed", reply_text)
+            intake_data['severity'] = int(severity_match.group())
+            request.session['intake_state'] = 'AWAITING_FACTORS'
+            request.session['intake_data'] = intake_data
+            reply_text = (
+                "Thanks for that. Have you tried any **home remedies or "
+                "over-the-counter medications** for this? Did anything make "
+                "it better or worse?"
+            )
+            return _log_and_reply(raw_message, "intake_severity", reply_text)
+
+        elif session_state == 'AWAITING_FACTORS':
+            intake_data['factors'] = raw_message
+            request.session['intake_state'] = 'AWAITING_CONDITIONS'
+            request.session['intake_data'] = intake_data
+            reply_text = (
+                "Do you have any **ongoing medical conditions** (like "
+                "diabetes, hypertension, or asthma) that I should keep in "
+                "mind?"
+            )
+            return _log_and_reply(raw_message, "intake_factors", reply_text)
+
+        # ---- Phase 4: Medical Context ---------------------------------------
+        elif session_state == 'AWAITING_CONDITIONS':
+            intake_data['conditions'] = raw_message
+            request.session['intake_state'] = 'AWAITING_MEDS'
+            request.session['intake_data'] = intake_data
+            reply_text = (
+                "Are you currently taking any **prescription medications**, "
+                "and do you have any **known drug allergies**?"
+            )
+            return _log_and_reply(raw_message, "intake_conditions", reply_text)
+
+        # ---- Phase 5: Resolution & Handoff ----------------------------------
+        elif session_state == 'AWAITING_MEDS':
+            intake_data['medications'] = raw_message
+
+            # Reuse the same CARE_TRACKS matching logic as Layer 3 so the
+            # specialty prediction stays consistent across the app instead
+            # of introducing a second, separate classifier.
+            symptom_lower = intake_data.get('primary_symptom', '').lower()
+            matched_track = None
+            for track in CARE_TRACKS.values():
+                if _has_word(track["match"], symptom_lower):
+                    matched_track = track
+                    break
+
+            if matched_track:
+                specialty = matched_track["title"]
+                care_plan = matched_track["cure_plan"]
+            else:
+                specialty = "General Medicine"
+                care_plan = DEFAULT_TRACK["cure_plan"]
+
+            summary_lines = [
+                f"**Patient type**: {intake_data.get('patient_type', 'n/a')}",
+            ]
+            if 'age' in intake_data:
+                summary_lines.append(f"**Age / sex**: {intake_data['age']} / {intake_data.get('biological_sex', 'n/a')}")
+            if 'verification_info' in intake_data:
+                summary_lines.append(f"**Verification info**: {intake_data['verification_info']}")
+            summary_lines += [
+                f"**Primary symptom**: {intake_data.get('primary_symptom', 'n/a')}",
+                f"**Duration**: {intake_data.get('duration', 'n/a')}",
+                f"**Severity**: {intake_data.get('severity', 'n/a')}/10",
+                f"**Aggravating/alleviating factors**: {intake_data.get('factors', 'n/a')}",
+                f"**Pre-existing conditions**: {intake_data.get('conditions', 'n/a')}",
+                f"**Medications / allergies**: {intake_data['medications']}",
+            ]
+
+            reply_text = (
+                "Here's a summary of what you've shared:\n\n"
+                + "\n".join(f"• {line}" for line in summary_lines)
+                + f"\n\nBased on what you've shared, your symptoms align "
+                  f"with our **{specialty}** triage track. I recommend "
+                  f"monitoring this closely.\n\nHere is your self-care "
+                  f"guidance: **{care_plan}**\n\n_This is general guidance, "
+                  f"not a diagnosis — please confirm with a clinician._\n\n"
+                  f"Would you like me to flag this for a **human physician** "
+                  f"to review?"
+            )
+
+            request.session['intake_state'] = 'AWAITING_HANDOFF'
+            request.session['intake_data'] = intake_data
+            return _log_and_reply(raw_message, "intake_summary_triage", reply_text)
+
+        elif session_state == 'AWAITING_HANDOFF':
+            if "yes" in lower_message:
+                reply_text = (
+                    "Done — I've flagged this case for a human physician to "
+                    "review. They'll follow up with you directly. Is there "
+                    "anything else I can help with?"
                 )
             else:
-                # Regular processing for active symptom profiles
-                intake_data['symptoms'] = raw_message
-                if any(w in symptom_lower for w in ["pain", "blood", "pelvic", "discomfort"]):
-                    diagnostic_remark = "⚠️ **Pre-clinical Alert**: Noted potential local inflammation or tissue stress indicators. Recommended screening tracking against the Pathology Telemetry matrix."
-                else:
-                    diagnostic_remark = "📋 **General Observation**: General baseline symptoms recorded. Monitor variance over a 14-day tracking cycle."
-
                 reply_text = (
-                    f"👨‍⚕️ **[INSPECTION COMPLETED FOR {intake_data['name'].upper()}]**\n\n"
-                    f"📊 **VITAL STATISTICS CHART**:\n"
-                    f"• **Age**: {intake_data['age']} years old\n"
-                    f"• **Biometrics**: {intake_data['height']} cm / {intake_data['weight']} kg\n"
-                    f"• **Calculated BMI**: `{bmi}`\n\n"
-                    f"🩺 **CLINICAL FITNESS EVALUATION**:\n"
-                    f"• Status: {fitness_status}\n"
-                    f"• Symptoms Reported: *\"{intake_data['symptoms']}\"*\n"
-                    f"• Diagnostic Assessment: {diagnostic_remark}\n\n"
-                    f"⏱️ *Intake complete. Session logs successfully updated in database memory.*"
+                    "Understood, no physician flag for now. Take care of "
+                    "yourself, and feel free to check in again any time."
                 )
-
-            # Unconditionally clear the engine state room so the next turn is completely fresh
             request.session['intake_state'] = 'IDLE'
             request.session['intake_data'] = {}
-            return _log_and_reply(raw_message, "diagnostic_intake_complete", reply_text)
+            return _log_and_reply(raw_message, "intake_handoff_complete", reply_text)
+
         # ==========================================================
         # 👋 LAYER 0.2: GREETING / SMALL-TALK INTENTS
         # ==========================================================
@@ -566,10 +639,13 @@ def chatbot_view(request):
             reply_text = random.choice(AFFIRM_REPLIES)
             return _log_and_reply(raw_message, "affirmation", reply_text)
 
+        if _is_pure_affirmation(lower_message, NEGATIVE_CLOSE_WORDS):
+            reply_text = random.choice(NEGATIVE_CLOSE_REPLIES)
+            return _log_and_reply(raw_message, "negative_close", reply_text)
+
         # ==========================================================
         # 🎯 LAYER 1: DYNAMIC SYMPTOM DURATION & SEVERITY TRIAGE
         # ==========================================================
-        
         # State 1-B: Capture incoming response to "How long have you felt this way?"
         if session_state == 'TRACKING_DURATION':
             intake_data['duration_text'] = raw_message
@@ -582,14 +658,12 @@ def chatbot_view(request):
             intake_data['severity_text'] = raw_message
             diagnosis = intake_data.get('suspected_diagnosis', 'General Triage Condition')
             duration_msg = intake_data.get('duration_text', 'unknown duration').lower()
-            
             # Smart Chronicity Filter Matrix
             is_chronic = any(w in duration_msg for w in ["weeks", "months", "years", "long time", "chronic", "3 weeks", "14 days"])
-            
             chronicity_label = "⚠️ **CHRONIC RISK TRAIL**" if is_chronic else "🟢 **ACUTE / TEMPORARY TIER**"
             timeline_guidance = (
-                "This symptom has persisted over a long window. A comprehensive diagnostic screen is advised to rule out deeper systemic changes." 
-                if is_chronic else 
+                "This symptom has persisted over a long window. A comprehensive diagnostic screen is advised to rule out deeper systemic changes."
+                if is_chronic else
                 "This appears to be a sudden, acute flare-up. Monitor presentation over the next 48-72 hours."
             )
 
@@ -603,7 +677,6 @@ def chatbot_view(request):
                 f"• Insight: {timeline_guidance}\n\n"
                 f"👉 *To see specialized medical track care steps, type the words 'next step' below.*"
             )
-            
             # Reset conversation parameters
             request.session['intake_state'] = 'IDLE'
             request.session['intake_data'] = {}
@@ -621,9 +694,27 @@ def chatbot_view(request):
                     # Cache the baseline diagnosis guess, then prompt for timing parameters
                     request.session['intake_state'] = 'TRACKING_DURATION'
                     request.session['intake_data'] = {'suspected_diagnosis': diagnosis}
-                    
                     reply_text = f"👨‍⚕️ I notice you mentioned indicators that trace closely with **{diagnosis}**.\n\nTo safely analyze this, **from how much time have you been feeling these things?**"
                     return _log_and_reply(raw_message, "triage_intercept_start", reply_text)
+
+        # ==========================================================
+        # 🧹 LAYER 1.8: MEANINGLESS / NON-CLINICAL INPUT GUARD
+        # ==========================================================
+        # Prevents garbage input (pure numbers, symbols, or too little
+        # alphabetic content — e.g. "123") from reaching the ML classifier
+        # below. Without this, the classifier still returns *some* label
+        # for input with no real content, and that label can coincidentally
+        # match a CARE_TRACKS keyword — producing a full clinical triage
+        # response (recommended next step, precautions, etc.) for input
+        # that was never actually a symptom description.
+        alpha_tokens = [t for t in raw_tokens if re.search(r'[a-zA-Z]', t)]
+        if not alpha_tokens or len("".join(alpha_tokens)) < 3:
+            reply_text = (
+                "I'm not sure I caught that — could you describe what's "
+                "going on in a few words (e.g., symptoms you're noticing, "
+                "or how you're feeling)?"
+            )
+            return _log_and_reply(raw_message, "unrecognized_input", reply_text)
 
         # ==========================================================
         # 📋 LAYER 1.5: PATIENT METADATA & LENGTH OF STAY FORECAST
@@ -696,6 +787,7 @@ def chatbot_view(request):
     except Exception as e:
         return JsonResponse({'error': f"NLP Exception Handling Request: {str(e)}"}, status=500)
 
+
 # ==========================================================
 # 🥗 SELF-CHECK / DIET ENGINE VIEW
 # (Restored to module level — this was previously defined *nested inside*
@@ -756,7 +848,6 @@ def self_check_diet_engine_view(request):
     # ==========================================================
     # 🥗 CLINICAL DYNAMIC MEAL GENERATOR TREE (BMI + GENDER + DIET)
     # ==========================================================
-    
     # 🛑 GUARD CONDITION: If the category is Normal Weight, skip the meal plan completely
     if bmi_tier == "Normal Weight":
         diet_plan = (
@@ -766,7 +857,6 @@ def self_check_diet_engine_view(request):
             f"No corrective therapeutic diet plan is required at this time. Focus on intuitive, well-balanced eating "
             f"and maintaining your active lifestyle to sustain these current telemetry baselines!"
         )
-    
     # 🟠 CATEGORY 1: OVERWEIGHT / OBESE PROFILES
     elif bmi_tier in ["Overweight", "Obese"]:
         if diet_pref in ["NON_VEG", "NON-VEG"]:
